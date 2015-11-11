@@ -1,13 +1,14 @@
+![Alt text](https://getkong.org/assets/images/branding.svg)
 ## kongの利用方法
 
 APIマーケットプレイスとして有名な[mashape](https://www.mashape.com/)が開発しているオープンソースソフトウェア版のAPI Managementであるkongの利用方法をまとめます。
 
 
-[APIの登録](https://getkong.org/docs/0.5.x/admin-api/#add-api)
+- APIの登録 [kong docs](https://getkong.org/docs/0.5.x/admin-api/#add-api)
 ```
 $ curl -i -X POST http://localhost:8001/apis -d "name=mockbin&upstream_url=http://mockbin.com/bin/800a818b-5fb6-40d4-a342-75a1fb8599db&request_path=mockbin&strip_request_path=true"
 ```
-strip_request_path=trueになっているので、http://localhost:8000/mockbinとアクセスすると上位URLにはURIから/mockbinがはずれてhttp://mockbin.com/bin/800a818b-5fb6-40d4-a342-75a1fb8599dbにアクセスする。これを入れないとhttp://mockbin.com/mockbin/bin/800a818b-5fb6-40d4-a342-75a1fb8599dbにアクセスしてしまう。
+strip_request_path=trueになっているので、<http://localhost:8000/mockbin>とアクセスすると上位URLにはURIから/mockbinがはずれて<http://mockbin.com/bin/800a818b-5fb6-40d4-a342-75a1fb8599db>にアクセスする。これを入れないと<http://mockbin.com/mockbin/bin/800a818b-5fb6-40d4-a342-75a1fb8599db>にアクセスしてしまう。
 
 
 APIへのアクセス試験
