@@ -1,102 +1,119 @@
 ![Alt text](https://getkong.org/assets/images/branding.svg)
 ## kongの利用方法
 
-APIマーケットプレイスとして有名な[mashape](https://www.mashape.com/)が開発しているオープンソースソフトウェア版のAPI Managementであるkongの利用方法をまとめます。
+APIマーケットプレイスとして有名な[mashape](https://www.mashape.com/)が開発しているオープンソースソフトウェア版のAPI Managementである[kong](https://getkong.org/)の利用方法をまとめます。
 
 
-- APIの登録 [kong docs](https://getkong.org/docs/0.5.x/admin-api/#add-api)
+### API関連
+
+バックエンドのAPIをkong経由でアクセス可能にするための定義を行う。kongではAPIにアクセスしたクライアントのDNSアドレスによってバックエンドAPIを指定する方法とAPIのURIのパスに従ってバックエンドAPIを指定する方法があり、ここではAPIのURIのパスに従ってバックエンドAPIを指定する方法を採用する。詳細は[kongドキュメント](https://getkong.org/docs/0.5.x/admin-api)を参照。
+
+#### APIの登録
+詳細は[kongドキュメント](https://getkong.org/docs/0.5.x/admin-api/#add-api)を参照
 ```
-$ curl -i -X POST http://localhost:8001/apis -d "name=mockbin&upstream_url=http://mockbin.com/bin/800a818b-5fb6-40d4-a342-75a1fb8599db&request_path=mockbin&strip_request_path=true"
-```
-strip_request_path=trueになっているので、<http://localhost:8000/mockbin>とアクセスすると上位URLにはURIから/mockbinがはずれて<http://mockbin.com/bin/800a818b-5fb6-40d4-a342-75a1fb8599db>にアクセスする。これを入れないと<http://mockbin.com/mockbin/bin/800a818b-5fb6-40d4-a342-75a1fb8599db>にアクセスしてしまう。
-
-
-APIへのアクセス試験
-```
-$ curl -i -X GET http://localhost:8000/mockbin
+$ curl -X POST http://localhost:8001/apis -d "name=mockbin&upstream_url=http://mockbin.com/bin/800a818b-5fb6-40d4-a342-75a1fb8599db&request_path=mockbin&strip_request_path=true"
 ```
 
-
-[APIの更新](https://getkong.org/docs/0.5.x/admin-api/#update-api)
-```
-$ curl -i -X PATCH http://localhost:8001/apis/mockbin -d "name=mockbin&upstream_url=http://mockbin.com/bin/800a818b-5fb6-40d4-a342-75a1fb8599db&request_path=mockbin2&strip_request_path=true"
-```
+(strip_request_path=trueになっているので、<http://localhost:8000/mockbin>とアクセスすると上位URLにはURIから/mockbinがはずれて<http://mockbin.com/bin/800a818b-5fb6-40d4-a342-75a1fb8599db>にアクセスする。これを入れないと<http://mockbin.com/mockbin/bin/800a818b-5fb6-40d4-a342-75a1fb8599db>にアクセスしてしまう。)
 
 
-APIへのアクセス試験
+#### APIへのアクセス試験
 ```
-$ curl -i -X GET http://localhost:8000/mockbin2
+$ curl -X GET http://localhost:8000/mockbin
 ```
 
 
-API名を元に戻す
+#### APIの更新
+詳細は[kongドキュメント](https://getkong.org/docs/0.5.x/admin-api/#update-api)を参照
 ```
-$ curl -i -X PATCH http://localhost:8001/apis/mockbin -d "name=mockbin&upstream_url=http://mockbin.com/bin/800a818b-5fb6-40d4-a342-75a1fb8599db&request_path=mockbin&strip_request_path=true"
-```
-
-
-基本認証プラグイン追加
-```
-$ curl -i -X POST http://localhost:8001/apis/mockbin/plugins -d "name=basic-auth"
+$ curl -X PATCH http://localhost:8001/apis/mockbin -d "name=mockbin&upstream_url=http://mockbin.com/bin/800a818b-5fb6-40d4-a342-75a1fb8599db&request_path=mockbin2&strip_request_path=true"
 ```
 
 
-キー認証プラグイン追加
+#### APIへのアクセス試験
 ```
-$ curl -i -X POST http://localhost:8001/apis/mockbin/plugins -d "name=key-auth"
+$ curl -X GET http://localhost:8000/mockbin2
+```
+
+
+#### API名を元に戻す
+```
+$ curl -X PATCH http://localhost:8001/apis/mockbin -d "name=mockbin&upstream_url=http://mockbin.com/bin/800a818b-5fb6-40d4-a342-75a1fb8599db&request_path=mockbin&strip_request_path=true"
+```
+
+
+### プラグイン関連
+
+kongではマイクロサービスの設計方針を採用しており、小さな機能をプラグインに分け、必要に応じてプラグインを有効化することで機能を実現している。ここでは[認証プラグイン](https://getkong.org/plugins/#authentication)、[セキュリティ・プラグイン](https://getkong.org/plugins/#security)、[流量制御プラグイン](https://getkong.org/plugins/#traffic-control)、[ロギング・プラグイン](https://getkong.org/plugins/#logging)を利用する。
+
+プラグインは登録されたAPIごとに設定するため、アクセス権やセキュリティ設定、流量制御はAPIに設定される。そのため、APIのURIとアクセス権
+
+#### 認証プラグイン
+
+ここでは、基本認証プラグイン、キー認証プラグイン、OAuth2認証プラグインを利用する。認証プラグインはAPIに追加され、開発者にキーが発行されると利用可能になる。一つのAPIにこの３つの認証プラグインすべてを追加しても、はまた、どの開発者がどのAPIにアクセス可能かといったアクセスコントロール(ACL)を設定することも可能であるが、それについては後述する。
+
+#### 基本認証プラグイン追加
+```
+$ curl -X POST http://localhost:8001/apis/mockbin/plugins -d "name=basic-auth"
+```
+
+
+#### キー認証プラグイン追加
+```
+$ curl -X POST http://localhost:8001/apis/mockbin/plugins -d "name=key-auth"
 ```
 
 
 OAuth2認証プラグイン追加
 ```
-$ curl -i -X POST http://localhost:8001/apis/mockbin/plugins -d "name=oauth2"
+$ curl -X POST http://localhost:8001/apis/mockbin/plugins -d "name=oauth2"
 ```
 
 
 CORS設定
 ```
-$ curl -i -X POST http://localhost:8001/apis/mockbin/plugins -d "name=cors"
+$ curl -X POST http://localhost:8001/apis/mockbin/plugins -d "name=cors"
 ```
 
 Request Size Limiting設定
 ```
-$ curl -i -X POST http://localhost:8001/apis/mockbin/plugins -d "name=request-size-limiting"
+$ curl -X POST http://localhost:8001/apis/mockbin/plugins -d "name=request-size-limiting"
 ```
 
 
 HTTP Log設定
 ```
-$ curl -i -X POST http://localhost:8001/apis/mockbin/plugins -d "name=http-log&config.http_endpoint=http://localhost:3000/kmonitor"
+$ curl -X POST http://localhost:8001/apis/mockbin/plugins -d "name=http-log&config.http_endpoint=http://localhost:3000/kmonitor"
 ```
 
 
 IP Restriction設定
 ```
-$ curl -i -X POST http://localhost:8001/apis/mockbin/plugins -d "name=ip-restriction&config.whitelist=0.0.0.0/24"
+$ curl -X POST http://localhost:8001/apis/mockbin/plugins -d "name=ip-restriction&config.whitelist=0.0.0.0/255"
 ```
 
 
 SSL設定 [鍵の作り方等はこちらを参照](https://getkong.org/plugins/ssl/)
 ```
-$ curl -i -X POST http://localhost:8001/apis/mockbin/plugins -d "name=ssl&config.cert=/etc/kong/server.crt&config.key=/etc/kong/server.key&config.only_https=true"
+$ curl -X POST http://localhost:8001/apis/mockbin/plugins -d "name=ssl&config.cert=/etc/kong/server.crt&config.key=/etc/kong/server.key&config.only_https=true"
 ```
 
 
 Rate Limiting設定
 ```
-$ curl -i -X POST http://localhost:8001/apis/mockbin/plugins -d "name=rate-limiting&config.second=1"
+$ curl -X POST http://localhost:8001/apis/mockbin/plugins -d "name=rate-limiting&config.second=1"
 ```
 
 
 ACL登録
 ```
-$ curl -i -X POST http://localhost:8001/apis/mockbin/plugins -d "name=acl&config.whitelist=mockbin"
+$ curl -X POST http://localhost:8001/apis/mockbin/plugins -d "name=acl&config.whitelist=mockbin"
 ```
 
 
 プラグインのリスト(プラグインの更新・削除のためにidが必要なため実行)
 ```
-$ curl -i -X POST http://localhost:8001/apis/mockbin/plugins
+$ curl -X POST http://localhost:8001/apis/mockbin/plugins
 Response Body
 {
   "data": [
@@ -221,13 +238,13 @@ Response Body
 
 基本認証プラグイン更新(config.hide_credentials(認証キー情報を上位URLに渡さない)を修正できる)
 ```
-$ curl -i -X PATCH http://localhost:8001/apis/mockbin/plugins/51cf6990-df83-4e60-cead-c1f27d88cad0 -d "config.hide_credentials=true"
+$ curl -X PATCH http://localhost:8001/apis/mockbin/plugins/51cf6990-df83-4e60-cead-c1f27d88cad0 -d "config.hide_credentials=true"
 ```
 
 
 キー認証プラグイン更新(config.key_names(apikeyというデフォルト名を修正,複数設定可能)、config.hide_credentials(認証キー情報を上位URLに渡さない)を修正できる)
 ```
-$ curl -i -X PATCH http://localhost:8001/apis/mockbin/plugins/2bb33e2d-2079-4fad-cf8b-252a3659f10e -d "config.hide_credentials=true&config.key_names=apikey,client_id"
+$ curl -X PATCH http://localhost:8001/apis/mockbin/plugins/2bb33e2d-2079-4fad-cf8b-252a3659f10e -d "config.hide_credentials=true&config.key_names=apikey,client_id"
 ```
 
 
