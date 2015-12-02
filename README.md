@@ -3,18 +3,20 @@
 
 APIマーケットプレイスとして有名な[mashape](https://www.mashape.com/)が開発しているオープンソースソフトウェア版のAPI Managementである[kong](https://getkong.org/)の利用方法をまとめます。
 
-ここではkong設定ファイル（/etc/kong/kong.yml）のproxy_portをデフォルトの8000から80に変更し、kongに登録したAPIをhttpでアクセスできるように設定しています。
+
+
+ここではkong設定ファイル（/etc/kong/kong.yml）のproxy_portをデフォルトの8000から80に変更し、kongに登録したAPIをhttpでアクセスできるように設定しており、それに従ってコマンドサンプルを記述しています。
 
 また、コマンド例に出てくる[jqコマンド](https://stedolan.github.io/jq/)は出力されるjson文字列を整形するコマンドです。
 
 
 ### API関連
 
-バックエンドのAPIをkong経由でアクセス可能にするための定義を行う。kongではAPIにアクセスしたクライアントのDNSアドレスによってバックエンドAPIを指定する方法とAPIのURIのパスに従ってバックエンドAPIを指定する方法があり、ここではAPIのURIのパスに従ってバックエンドAPIを指定する方法を採用する。詳細は[kongドキュメント](https://getkong.org/docs/0.5.x/admin-api)を参照。
+管理者は、アップストリームのAPIをkong経由でアクセス可能にするための定義を行います。kongではAPIにアクセスしたクライアントのDNSアドレスによってアップストリームAPIを指定する方法とAPIのURIのパスに従ってアップストリームAPIを指定する方法がありますが、ここではAPIのURIのパスに従ってアップストリームAPIを指定する方法を採用します（DNSアドレスによって切り替える方法を採用するケースは少ないと考えるため）。詳細は[kongドキュメント](https://getkong.org/docs/0.5.x/admin-api)を参照してください。
 
 
 #### APIの登録
-詳細は[kongドキュメント](https://getkong.org/docs/0.5.x/admin-api/#add-api)を参照
+アップストリームAPIを指定してkongにAPIを登録します。詳細は[kongドキュメント](https://getkong.org/docs/0.5.x/admin-api/#add-api)を参照してください。
 ```
 $ curl -s -X POST http://localhost:8001/apis -d "name=mockbin&upstream_url=http://mockbin.com/bin/800a818b-5fb6-40d4-a342-75a1fb8599db&request_path=mockbin&strip_request_path=true" | jq .
 {
@@ -28,6 +30,7 @@ $ curl -s -X POST http://localhost:8001/apis -d "name=mockbin&upstream_url=http:
 ```
 
 ※ strip_request_path=trueになっているため、<http://localhost:8000/mockbin>とアクセスすると上位URLにはURIから/mockbinがはずれて<http://mockbin.com/bin/800a818b-5fb6-40d4-a342-75a1fb8599db>にアクセスします。これを入れないと<http://mockbin.com/mockbin/bin/800a818b-5fb6-40d4-a342-75a1fb8599db>にアクセスします。
+
 ※ レスポンスボディのcreated_atは1970/01/01からのミリ秒を表します。
 
 
@@ -43,8 +46,10 @@ $ curl -s -X GET http://localhost/mockbin | jq .
 ```
 
 
-#### APIの更新(URIパスを /mockbin -> /mockbin2 に変更します)
-詳細は[kongドキュメント](https://getkong.org/docs/0.5.x/admin-api/#update-api)を参照
+#### APIの更新
+(URIパスを /mockbin -> /mockbin2 に変更します)
+
+登録したAPIの情報を更新します。詳細は[kongドキュメント](https://getkong.org/docs/0.5.x/admin-api/#update-api)を参照してください。
 ```
 $ curl -s -X PATCH http://localhost:8001/apis/mockbin -d "name=mockbin&upstream_url=http://mockbin.com/bin/800a818b-5fb6-40d4-a342-75a1fb8599db&request_path=mockbin2&strip_request_path=true" | jq .
 {
@@ -58,7 +63,8 @@ $ curl -s -X PATCH http://localhost:8001/apis/mockbin -d "name=mockbin&upstream_
 ```
 
 
-#### APIへのアクセス試験(URIパスが変更されています)
+#### APIへのアクセス試験
+(URIパスが変更されています)
 ```
 $ curl -s -X GET http://localhost:8000/mockbin2 | jq .
 [
@@ -70,7 +76,8 @@ $ curl -s -X GET http://localhost:8000/mockbin2 | jq .
 ```
 
 
-#### APIのURIパスを元に戻します(/mockbin2 -> /mockbin)
+#### APIのURIパスを元に戻します
+(/mockbin2 -> /mockbin)
 ```
 $ curl -s -X PATCH http://localhost:8001/apis/mockbin -d "name=mockbin&upstream_url=http://mockbin.com/bin/800a818b-5fb6-40d4-a342-75a1fb8599db&request_path=mockbin&strip_request_path=true" | jq .
 {
@@ -90,10 +97,11 @@ kongではマイクロサービスの設計方針を採用しており、小さ�
 
 登録されたAPIに認証方式やセキュリティ設定、流量制御を設定するには、APIにこれらのプラグインを追加する形で設定します。設定ステップは下記の通りです。
 
-1. 登録されたAPIに認証プラグインを追加します。認証プラグインは複数設定することが可能ですが、同一APIで複数の認証が求められ、ユーザーの混乱を避けるため、一つのAPIに一つの認証プラグインに限定することをお勧めします。
-2. このままだと認証キーを発行したユーザーはすべてのAPIにアクセス可能になるため、APIにアクセスコントロール(ACL)のプラグインを追加します。ACLプラグイン登録時にグループ名を設定します。ユーザーがこのグループに所属している場合のみ、ユーザーが発行した認証キーを使ってグループの所属APIにアクセスすることが可能です。この時、GET/POST/PUT/DELETEの区別をしないため、注意が必要です(元のAPIがGETとDELETEで同じURIを使っている場合、参照も削除も可能になってしまうため、API設計時に考慮が必要です)。
-3. 開発者としてユーザーを登録し、認証キーを発行します。また、アクセスを許可するAPIに登録したグループをユーザーのグループとして設定します。
-4. セキュリティ設定および流量制御のプラグインについては、APIに追加する際、ユーザーIDを指定することが可能です。これによって、どのユーザーについて制御を行うかを指定します。
+1. 管理者は、APIに「認証プラグイン」を追加し、許可したユーザだけがAPIにアクセス可能に設定します。認証プラグインは、一つのAPIに複数種類を追加することが可能ですが、同一APIで複数種類の認証が求められるとユーザーを混乱させるため、一つのAPIに設定する認証プラグインは一つにすることをお勧めします。
+2. 1の設定だけでは、認証キーを持つユーザーは誰でもこのAPIにアクセス可能になってしまいます。これを回避するために、管理者はAPIにアクセスコントロール(ACL)のプラグインを追加します。また、ACLプラグインをAPIに登録する際にグループ名を設定すると、このグループに所属しているユーザーだけが、対象のAPIにアクセスすることが可能になります。そのため、管理者は、APIへのアクセスを許可するユーザーをAPIのグループに追加します。
+3. 管理者は、APIに「セキュリティ・プラグイン」を追加し、CORS設定（クロスサイトスクリプティングの制限回避のためのサーバー側の設定）やIP制限の設定（アクセス可能もしくは不可能なIPアドレスを指定）を行います。プラグイン追加時にはユーザーIDを指定し、どのユーザーについて制御を行うかを指定します。
+4. 管理者は、APIに「流量制御プラグイン」を追加し、指定時間内のHTTPリクエスト数制限の設定やレスポンスリクエストサイズ制限の設定（DOS攻撃に対応するためリクエストデータのサイズ量を制限）を行います。プラグイン追加時にはユーザーIDを指定し、どのユーザーについて制御を行うかを指定します。
+5. ユーザーは自らの認証キーを発行し、管理者に許可されたAPIにアクセスを行います。
 
 
 #### 認証プラグイン
@@ -167,7 +175,7 @@ $ curl -s -X DELETE http://localhost:8001/apis/mockbin/plugins/adbf776a-75b4-4d7
 
 #### ACLプラグイン登録
 
-APIに認証プラグインを追加しただけでは、認証キーを発行したユーザーはすべてのAPIにアクセス可能になります。特定のユーザーが特定のAPIにのみアクセス可能にするために、APIにアクセスコントロール(ACL)のプラグインを追加します。ACLプラグインは、登録時にグループ名を設定します(コマンドの引数で"config.whitelist"に指定する文字列がグループ名になります)。ユーザーがこのグループに所属している場合のみ、ユーザーが発行した認証キーを使ってグループの所属APIにアクセスすることが可能になります。この時、GET/POST/PUT/DELETEの区別をしないため、注意が必要です(元のAPIがGETとDELETEで同じURIを使っている場合、参照も削除も可能になってしまうため、API設計時に考慮が必要です)。
+特定のユーザーが特定のAPIにのみアクセス可能にするために、APIにアクセスコントロール(ACL)のプラグインを追加します。ACLプラグインは、登録時にグループ名を設定します(コマンドの引数で"config.whitelist"に指定する文字列がグループ名になります)。ユーザーがこのグループに所属している場合のみ、ユーザーが発行した認証キーを使ってグループの所属APIにアクセスすることが可能になります。ただし、GET/POST/PUT/DELETEの区別をしないため、注意が必要です(例えば、アップストリームAPIがGETとDELETEで同じURIを使っている場合、参照も削除も可能になってしまいます)。
 
 ```
 $ curl -s -X POST http://localhost:8001/apis/mockbin/plugins -d "name=acl&config.whitelist=mockbin" | jq .
@@ -185,9 +193,9 @@ $ curl -s -X POST http://localhost:8001/apis/mockbin/plugins -d "name=acl&config
 }
 ```
 
-#### ユーザーの登録
+#### ユーザーのAPIグループへの登録と認証キーの発行
 
-開発者としてユーザーを登録し、認証キーを発行します。また、アクセスを許可するAPIに登録したグループをユーザーのグループとして設定します。
+管理者は、ユーザーを作成し、アクセスを許可するAPIのグループにユーザーを登録します。また、ユーザーは認証キーを発行し、管理者に許可されたAPIへのアクセスを行います。
 
 
 ##### ユーザーの登録
