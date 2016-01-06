@@ -18,7 +18,7 @@ API管理者は、アップストリームのAPIをkong経由でアクセス可�
 
 
 #### APIの登録
-API管理者は、アップストリームAPIを指定してkongにAPIを登録します。詳細は[kongドキュメント](https://getkong.org/docs/0.5.x/admin-api/#add-api)を参照してください。
+API管理者は、アップストリームAPIを指定してkongにAPIを登録します。nameはAPI名、request_pathはkongに設定されるAPIのURIパスを意味します。これらは一意の値である必要があるため、既存の値を登録しようとするとエラーになります。詳細は[kongドキュメント](https://getkong.org/docs/0.5.x/admin-api/#add-api)を参照してください。
 ```
 $ curl -s -X POST http://localhost:8001/apis -d "name=mockbin&upstream_url=http://mockbin.com/bin/800a818b-5fb6-40d4-a342-75a1fb8599db&request_path=mockbin&strip_request_path=true" | jq .
 {
@@ -100,8 +100,8 @@ kongではマイクロサービスの設計方針を採用しており、小さ�
 APIに認証やセキュリティ、流量制御を設定するには、APIにこれらのプラグインを追加します。設定ステップは下記の通りです。
 
 1. API管理者は、APIに「認証プラグイン」を追加し、許可したユーザーだけがAPIにアクセス可能になるように設定します。認証プラグインは、一つのAPIに複数種類を追加することが可能ですが、同一APIで複数種類の認証が求められるとAPI利用者を混乱させるため、一つのAPIに設定する認証プラグインは一つにすることをお勧めします。
-2. 1の設定だけでは、認証キーを持つユーザーは誰でもこのAPIにアクセス可能になってしまいます。これを回避するために、API管理者はAPIにアクセスコントロール(ACL)のプラグインを追加します。また、ACLプラグインをAPIに登録する際にグループ名を設定すると、このグループに所属しているユーザーだけが対象のAPIにアクセスすることが可能になります。そのため、API管理者は、APIへのアクセスを許可するユーザーをAPIのグループに追加します。
-3. API管理者は、APIに「セキュリティ・プラグイン」を追加し、CORS設定（クロスサイトスクリプティングの制限回避のためのサーバー側の設定）やIP制限の設定（アクセス可能もしくは不可能なIPアドレスを指定）を行います。プラグイン追加時にはユーザーIDを指定し、どのユーザーについて制御を行うかを指定します。
+2. 1の設定だけでは、認証キーを持つユーザーは誰でもこのAPIにアクセス可能になってしまいます。これを回避するために、API管理者はAPIにアクセスコントロール(ACL)のプラグインを追加します。ACLプラグインをAPIに登録する際、whitelistパラメータにグループ名を設定ることで、このグループに所属しているユーザーだけが対象のAPIにアクセス可能になるよう設定することができます。API管理者は、開発者としてユーザーを作成し、アクセスを許可するAPIのグループに追加することでACLを管理することができます。
+3. API管理者は、APIに「セキュリティ・プラグイン」を追加し、CORS設定（クロスサイトスクリプティングの制限回避のためのサーバー側の設定）やIP制限の設定（アクセス可能もしくは不可能なIPアドレスを指定）を行います。CORS設定以外は、プラグイン追加時にユーザーIDを指定し、どのユーザーについて制御を行うかを指定することができます。
 4. API管理者は、APIに「流量制御プラグイン」を追加し、指定時間内のHTTPリクエスト数制限の設定やリクエストサイズ制限の設定（DOS攻撃に対応するためリクエストデータのサイズ量を制限）を行います。プラグイン追加時にはユーザーIDを指定し、どのユーザーについて制御を行うかを指定します。
 5. 開発者は、自らの認証キーを発行し、API管理者に許可されたAPIにアクセスを行います。
 
@@ -279,7 +279,7 @@ $ curl -s -X GET http://localhost/mockbin --user user1:password | jq .
 API管理者は、「セキュリティ・プラグイン」として「CORS設定」や「IP制限の設定」を行います。プラグイン追加時にはユーザーIDを指定し、どのユーザーについて制御を行うかを指定します。
 
 ##### CORS設定
-CORS設定とは、クロスサイトスクリプティングの制限回避のためのサーバー側に設定するものです。これを設定すると、CORSを許可するブラウザであればJavaScriptが配布されたホスト以外から提供されるAPIにもアクセスが可能になります。プラグイン追加時にはユーザーIDを指定し、どのユーザーについて制御を行うかを指定します。
+CORS設定とは、クロスサイトスクリプティングの制限回避のためのサーバー側に設定するものです。これを設定すると、CORSを許可するブラウザであればJavaScriptが配布されたホスト以外から提供されるAPIにもアクセスが可能になります。
 ```
 $ curl -s -X POST http://localhost:8001/apis/mockbin/plugins -d "name=cors" | jq .
 {
@@ -301,7 +301,7 @@ config.origin(Access-Control-Allow-Originの値),config.methods(Access-Control-A
 ##### IP制限の設定
 IP制限の設定では、アクセス可能もしくは不可能なIPアドレスを指定します。プラグイン追加時にはユーザーIDを指定し、どのユーザーについて制御を行うかを指定します。
 ```
-$ curl -X POST http://localhost:8001/apis/mockbin/plugins -d "name=ip-restriction&config.whitelist=0.0.0.0/255"
+$ curl -X POST http://localhost:8001/apis/mockbin/plugins -d "name=ip-restriction&config.whitelist=0.0.0.0/255&consumer_id=a7a95439-481a-422c-c2d2-f590ff847a4d"
 ```
 
 #### セキュリティ設定プラグイン
@@ -311,11 +311,11 @@ API管理者は、「流量制御プラグイン」として、「HTTPリクエ�
 ##### リクエストサイズ制限の設定
 リクエストサイズ制限の設定では、DOS攻撃に対応するためリクエストデータのサイズ量を制限します。プラグイン追加時にはユーザーIDを指定し、どのユーザーについて制御を行うかを指定します。
 ```
-$ curl -X POST http://localhost:8001/apis/mockbin/plugins -d "name=request-size-limiting"
+$ curl -X POST http://localhost:8001/apis/mockbin/plugins -d "name=request-size-limiting&consumer_id=a7a95439-481a-422c-c2d2-f590ff847a4d"
 ```
 
 ##### HTTPリクエスト数制限の設定
 HTTPリクエスト数制限の設定では、単位時間当たりのHTTPリクエストの最大数の設定を行います。プラグイン追加時にはユーザーIDを指定し、どのユーザーについて制御を行うかを指定します。
 ```
-$ curl -X POST http://localhost:8001/apis/mockbin/plugins -d "name=rate-limiting&config.second=1"
+$ curl -X POST http://localhost:8001/apis/mockbin/plugins -d "name=rate-limiting&config.second=1&consumer_id=a7a95439-481a-422c-c2d2-f590ff847a4d"
 ```
