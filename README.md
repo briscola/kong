@@ -112,6 +112,9 @@ APIに認証やセキュリティ、流量制御を設定するには、APIに�
 
 
 ##### 基本認証プラグイン追加
+
+詳細は[こちら](https://getkong.org/plugins/#authentication)を参照。
+
 ```
 $ curl -s -X POST http://localhost:8001/apis/mockbin/plugins -d "name=basic-auth" | jq .
 {
